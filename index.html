@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Складской Контроль</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        :root {
+            --brand-red: #DF3B20;
+            --brand-dark: #424B52;
+            --bg-light: #f5f6f7;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+            background: var(--bg-light); 
+            margin: 0; 
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* Экран загрузки */
+        .loader-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-dark) 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .loader-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .logo-loader {
+            width: 200px;
+            max-width: 60%;
+            height: auto;
+            margin-bottom: 30px;
+            filter: brightness(0) invert(1);
+        }
+
+        .logo-loader img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .loader-text {
+            color: white;
+            font-size: 16px;
+            font-weight: 500;
+            margin-top: 15px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Хедер */
+        .header { 
+            background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-dark) 100%);
+            color: white; 
+            padding: 12px 15px; 
+            text-align: center; 
+            position: sticky; 
+            top: 0; 
+            z-index: 100;
+            font-size: 18px;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            height: 28px;
+            width: auto;
+            filter: brightness(0) invert(1);
+            flex-shrink: 0;
+        }
+
+        .header-logo svg {
+            height: 100%;
+            width: auto;
+            display: block;
+        }
+
+        @media (max-width: 480px) {
+            .header-logo {
+                height: 24px;
+            }
+            .header {
+                padding: 10px 12px;
+                gap: 10px;
+            }
+            .header-text {
+                font-size: 16px;
+            }
+        }
+
+        .header-text {
+            flex: 1;
+        }
+        
+        /* Стили вкладок */
+        .tabs { 
+            display: flex; 
+            background: white; 
+            border-bottom: 2px solid #e0e0e0;
+            position: sticky;
+            top: 56px;
+            z-index: 99;
+        }
+        .tab { 
+            flex: 1; 
+            padding: 16px 12px; 
+            text-align: center; 
+            cursor: pointer; 
+            font-weight: 600; 
+            color: #666;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .tab.active { 
+            color: var(--brand-red); 
+            border-bottom: 3px solid var(--brand-red);
+            background: linear-gradient(to bottom, rgba(223, 59, 32, 0.05), transparent);
+        }
+        .tab:active {
+            background: rgba(223, 59, 32, 0.1);
+        }
+
+        /* Контент */
+        .content { 
+            padding: 12px;
+            max-width: 100%;
+        }
+        
+        /* Заголовки групп */
+        .month-title, .defect-title { 
+            background: white;
+            padding: 12px 15px;
+            border-radius: 10px;
+            border-left: 5px solid var(--brand-red);
+            margin: 12px 0 8px 0;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--brand-dark);
+            animation: slideInLeft 0.5s ease-out;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .month-title:active {
+            transform: scale(0.98);
+        }
+        
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Цвета для сроков */
+        .m1 { border-left-color: #DF3B20; background: linear-gradient(to right, rgba(223, 59, 32, 0.1), white); }
+        .m2 { border-left-color: #E85A4F; background: linear-gradient(to right, rgba(232, 90, 79, 0.1), white); }
+        .m3 { border-left-color: #F08A5D; background: linear-gradient(to right, rgba(240, 138, 93, 0.1), white); }
+        .m4 { border-left-color: #F9B871; background: linear-gradient(to right, rgba(249, 184, 113, 0.1), white); }
+        .m5 { border-left-color: #A8C090; background: linear-gradient(to right, rgba(168, 192, 144, 0.1), white); }
+        .m6 { border-left-color: #6ABF7A; background: linear-gradient(to right, rgba(106, 191, 122, 0.1), white); }
+        .defect-line { border-left-color: #FF9800; background: linear-gradient(to right, rgba(255, 152, 0, 0.1), white); }
+        
+        /* Карточки товаров */
+        .product-item { 
+            background: white; 
+            margin-bottom: 8px; 
+            border-radius: 10px; 
+            overflow: hidden; 
+            cursor: pointer; 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            opacity: 0;
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+        
+        .product-item:nth-child(1) { animation-delay: 0.05s; }
+        .product-item:nth-child(2) { animation-delay: 0.1s; }
+        .product-item:nth-child(3) { animation-delay: 0.15s; }
+        .product-item:nth-child(4) { animation-delay: 0.2s; }
+        .product-item:nth-child(5) { animation-delay: 0.25s; }
+        .product-item:nth-child(6) { animation-delay: 0.3s; }
+        .product-item:nth-child(n+7) { animation-delay: 0.35s; }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .product-item:active {
+            transform: scale(0.98);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        }
+
+        .product-main { 
+            padding: 14px 15px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            gap: 12px;
+        }
+
+        .product-name {
+            flex: 1;
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--brand-dark);
+            line-height: 1.4;
+        }
+
+        .product-name small {
+            display: block;
+            margin-top: 4px;
+            font-size: 12px;
+            color: #888;
+            font-weight: 400;
+        }
+
+        .total-qty { 
+            background: linear-gradient(135deg, var(--brand-red) 0%, #C0301A 100%);
+            color: white; 
+            padding: 6px 14px; 
+            border-radius: 20px; 
+            font-weight: 700;
+            font-size: 14px;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(223, 59, 32, 0.3);
+        }
+
+        .warehouses-info { 
+            display: none; 
+            background: var(--bg-light); 
+            padding: 12px 15px; 
+            border-top: 2px dashed #e0e0e0; 
+            font-size: 13px;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                max-height: 0;
+            }
+            to {
+                opacity: 1;
+                max-height: 500px;
+            }
+        }
+
+        .active-item .warehouses-info { 
+            display: block; 
+        }
+
+        .warehouse-row { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            padding: 8px 0; 
+            border-bottom: 1px solid #e8e8e8;
+        }
+
+        .warehouse-row:last-child {
+            border-bottom: none;
+        }
+
+        .warehouse-row span {
+            color: var(--brand-dark);
+            font-weight: 500;
+        }
+
+        .warehouse-row strong {
+            color: var(--brand-red);
+            font-weight: 700;
+        }
+
+        /* Мобильная адаптация */
+        @media (max-width: 480px) {
+            .header {
+                padding: 16px 12px;
+                font-size: 16px;
+            }
+
+            .tab {
+                padding: 14px 8px;
+                font-size: 13px;
+            }
+
+            .content {
+                padding: 10px;
+            }
+
+            .month-title, .defect-title {
+                padding: 11px 12px;
+                font-size: 14px;
+                margin: 10px 0 6px 0;
+            }
+
+            .product-main {
+                padding: 12px;
+            }
+
+            .product-name {
+                font-size: 14px;
+            }
+
+            .total-qty {
+                padding: 5px 12px;
+                font-size: 13px;
+            }
+
+            .warehouses-info {
+                padding: 10px 12px;
+                font-size: 12px;
+            }
+
+            .warehouse-row {
+                padding: 6px 0;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .content {
+                max-width: 700px;
+                margin: 0 auto;
+            }
+        }
+
+        /* Пустое состояние */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--brand-dark);
+            opacity: 0.6;
+        }
+
+        /* Плавное появление контента */
+        .content {
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Экран загрузки -->
+<div class="loader-screen" id="loaderScreen">
+    <div class="logo-loader">
+        <img src="https://belinda.tj/img/main-logo.svg" alt="Belinda">
+    </div>
+    <div class="loader-text">Загрузка данных...</div>
+</div>
+
+<div class="header">Управление Остатками</div>
+
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('exp')">Сроковые</div>
+    <div class="tab" onclick="switchTab('def')">Дефектура (< 500)</div>
+</div>
+
+<div class="content" id="container"></div>
+
+<script>
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz_z0X6o9KNCL2OKN0kaxgoBHeB1kbPNfyEBXdi8G_cF5YTtEjqvH8vZBvRJdvwgL5h_Q/exec';
+    let rawData = [];
+
+    async function loadData() {
+        try {
+            const res = await fetch(SCRIPT_URL);
+            rawData = await res.json();
+            
+            // Имитация минимальной загрузки для плавности анимации
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Скрываем экран загрузки
+            const loader = document.getElementById('loaderScreen');
+            loader.classList.add('hidden');
+            
+            // Небольшая задержка перед рендерингом для плавности
+            setTimeout(() => {
+                renderExpiry(); // По умолчанию открываем Сроковые
+                loader.style.display = 'none';
+            }, 300);
+        } catch (error) {
+            const loader = document.getElementById('loaderScreen');
+            loader.innerHTML = '<div style="color: white; text-align: center; padding: 20px;">Ошибка загрузки данных</div>';
+        }
+    }
+
+    function switchTab(type) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        // Плавное скрытие контента перед переключением
+        const container = document.getElementById('container');
+        container.style.opacity = '0';
+        
+        setTimeout(() => {
+            if (type === 'exp') renderExpiry();
+            else renderDefect();
+            container.style.opacity = '1';
+        }, 150);
+    }
+
+    // Группировка товаров по названию с суммированием остатков
+    function groupProductsByName() {
+        const grouped = {};
+        
+        rawData.forEach(item => {
+            if (!grouped[item.name]) {
+                grouped[item.name] = {
+                    name: item.name,
+                    totalStock: 0,
+                    warehouses: {},
+                    expiryDates: []
+                };
+            }
+            
+            // Суммируем общий остаток
+            grouped[item.name].totalStock += (item.totalStock || 0);
+            
+            // Собираем все сроки годности
+            if (item.expiryDate) {
+                grouped[item.name].expiryDates.push(item.expiryDate);
+            }
+            
+            // Объединяем склады (суммируем если склад повторяется)
+            if (item.warehouses && Array.isArray(item.warehouses)) {
+                item.warehouses.forEach(wh => {
+                    const loc = wh.location || wh.loc || 'Неизвестно';
+                    if (!grouped[item.name].warehouses[loc]) {
+                        grouped[item.name].warehouses[loc] = 0;
+                    }
+                    grouped[item.name].warehouses[loc] += (wh.count || wh.qty || 0);
+                });
+            }
+        });
+        
+        // Преобразуем warehouses в массив и находим ближайший срок годности
+        return Object.values(grouped).map(product => {
+            product.warehouses = Object.entries(product.warehouses).map(([location, count]) => ({
+                location,
+                count
+            }));
+            
+            // Находим ближайший (минимальный) срок годности
+            if (product.expiryDates.length > 0) {
+                const validDates = product.expiryDates.filter(d => {
+                    const date = new Date(d);
+                    return !isNaN(date.getTime());
+                });
+                if (validDates.length > 0) {
+                    validDates.sort((a, b) => new Date(a) - new Date(b));
+                    product.expiryDate = validDates[0]; // Самый ближайший срок
+                } else {
+                    product.expiryDate = null;
+            }
+        } else {
+                product.expiryDate = null;
+            }
+            
+            return product;
+        });
+    }
+
+    function createProductHtml(p) {
+        let whHtml = '';
+        if (p.warehouses && p.warehouses.length > 0) {
+            whHtml = p.warehouses.map(wh => `
+                <div class="warehouse-row"><span>📍 ${wh.location}</span><strong>${wh.count} шт.</strong></div>
+            `).join('');
+        }
+        
+        const expiryText = p.expiryDate ? 
+            `Срок: ${new Date(p.expiryDate).toLocaleDateString('ru-RU')}` : 
+            'Срок не указан';
+        
+        return `
+            <div class="product-item" onclick="this.classList.toggle('active-item')">
+                <div class="product-main">
+                    <div class="product-name">${p.name} <small>${expiryText}</small></div>
+                    <div class="total-qty">${p.totalStock}</div>
+                </div>
+                <div class="warehouses-info">${whHtml || 'Нет данных по складам'}</div>
+                </div>
+        `;
+    }
+
+    function renderExpiry() {
+        const container = document.getElementById('container');
+        container.innerHTML = '';
+        const now = new Date();
+        const groups = {1:[], 2:[], 3:[], 4:[], 5:[], 6:[]};
+        
+        // Группируем товары по названию
+        const groupedProducts = groupProductsByName();
+
+        // Распределяем по группам месяцев на основе ближайшего срока
+        groupedProducts.forEach(product => {
+            if (!product.expiryDate) return;
+            
+            const exp = new Date(product.expiryDate);
+            if (isNaN(exp.getTime())) return;
+            
+            const diff = (exp.getFullYear() - now.getFullYear()) * 12 + (exp.getMonth() - now.getMonth());
+            if (diff >= 1 && diff <= 6) {
+                groups[diff].push(product);
+            }
+        });
+
+        // Выводим группы
+        let hasData = false;
+        for (let m = 1; m <= 6; m++) {
+            if (groups[m].length === 0) continue;
+            hasData = true;
+            let html = `<div class="month-title m${m}">Осталось месяцев: ${m}</div>`;
+            groups[m].forEach(p => html += createProductHtml(p));
+            container.innerHTML += html;
+        }
+        
+        if (!hasData) {
+            container.innerHTML = '<div class="empty-state">Нет товаров со сроком годности 1-6 месяцев</div>';
+        }
+    }
+
+    function renderDefect() {
+        const container = document.getElementById('container');
+        container.innerHTML = '<div class="defect-title defect-line">Товары с остатком менее 500 шт.</div>';
+        
+        // Группируем товары по названию и суммируем остатки
+        const groupedProducts = groupProductsByName();
+        
+        // Фильтруем товары с суммарным остатком меньше 500 и сортируем от меньшего к большему
+        const defectItems = groupedProducts
+            .filter(item => item.totalStock < 500)
+            .sort((a, b) => a.totalStock - b.totalStock);
+
+        if (defectItems.length === 0) {
+            container.innerHTML = '<div class="empty-state">Нет товаров с остатком менее 500 шт.</div>';
+        } else {
+            defectItems.forEach(p => {
+                container.innerHTML += createProductHtml(p);
+            });
+        }
+    }
+
+    loadData();
+</script>
+
+</body>
+</html>
