@@ -2,8 +2,12 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Складской Контроль</title>
+    <title>Склад Belinda</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#DF3B20">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
             --brand-red: #DF3B20;
@@ -16,12 +20,18 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden;
+        }
+
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
-            background: var(--bg-light); 
-            margin: 0; 
-            padding: 0;
-            overflow-x: hidden;
+            background: var(--bg-light);
+            -webkit-overflow-scrolling: touch;
         }
 
         /* Экран загрузки */
@@ -125,35 +135,102 @@
         .tabs { 
             display: flex; 
             background: white; 
-            border-bottom: 2px solid #e0e0e0;
+            border-bottom: 1px solid #e8e8e8;
             position: sticky;
             top: 56px;
             z-index: 99;
+            padding: 8px 12px 0;
+            gap: 8px;
         }
         .tab { 
             flex: 1; 
-            padding: 16px 12px; 
+            padding: 12px 16px; 
             text-align: center; 
             cursor: pointer; 
             font-weight: 600; 
             color: #666;
             font-size: 14px;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
+            border-radius: 12px 12px 0 0;
+            background: transparent;
         }
         .tab.active { 
             color: var(--brand-red); 
-            border-bottom: 3px solid var(--brand-red);
-            background: linear-gradient(to bottom, rgba(223, 59, 32, 0.05), transparent);
+            background: white;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+        }
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--brand-red) 0%, #C0301A 100%);
+            border-radius: 3px 3px 0 0;
         }
         .tab:active {
-            background: rgba(223, 59, 32, 0.1);
+            background: rgba(223, 59, 32, 0.08);
+        }
+        .tab:not(.active):hover {
+            background: rgba(0, 0, 0, 0.02);
         }
 
         /* Контент */
         .content { 
             padding: 12px;
             max-width: 100%;
+        }
+
+        /* Поле выбора даты */
+        .date-selector {
+            background: white;
+            padding: 12px 15px;
+            margin-bottom: 12px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .date-selector label {
+            font-weight: 600;
+            color: var(--brand-dark);
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .date-selector input[type="date"] {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--brand-dark);
+            font-weight: 500;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .date-selector input[type="date"]:focus {
+            border-color: var(--brand-red);
+        }
+
+        @media (max-width: 480px) {
+            .date-selector {
+                flex-direction: column;
+                align-items: stretch;
+                padding: 10px 12px;
+            }
+            .date-selector label {
+                font-size: 13px;
+            }
+            .date-selector input[type="date"] {
+                font-size: 13px;
+            }
         }
         
         /* Заголовки групп */
@@ -398,7 +475,7 @@
     <div class="loader-text">Загрузка данных...</div>
 </div>
 
-<div class="header">Управление Остатками</div>
+<div class="header">Склад Belinda</div>
 
 <div class="tabs">
     <div class="tab active" onclick="switchTab('exp')">Сроковые</div>
@@ -410,9 +487,23 @@
 <script>
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz_z0X6o9KNCL2OKN0kaxgoBHeB1kbPNfyEBXdi8G_cF5YTtEjqvH8vZBvRJdvwgL5h_Q/exec';
     let rawData = [];
+    let selectedDate = new Date(); // Текущая дата по умолчанию
+
+    // Инициализация Telegram Web App
+    function initTelegramWebApp() {
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand(); // Разворачиваем на весь экран
+            tg.enableClosingConfirmation(); // Подтверждение при закрытии
+        }
+    }
 
     async function loadData() {
         try {
+            // Инициализируем Telegram Web App
+            initTelegramWebApp();
+            
             const res = await fetch(SCRIPT_URL);
             rawData = await res.json();
             
@@ -533,10 +624,35 @@
         `;
     }
 
+    function formatDateForInput(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function updateSelectedDate() {
+        const dateInput = document.getElementById('expiryDateInput');
+        if (dateInput) {
+            selectedDate = new Date(dateInput.value);
+            renderExpiry();
+        }
+    }
+
     function renderExpiry() {
         const container = document.getElementById('container');
-        container.innerHTML = '';
-        const now = new Date();
+        
+        // Добавляем поле выбора даты
+        const dateSelector = `
+            <div class="date-selector">
+                <label for="expiryDateInput">Дата для расчета сроков:</label>
+                <input type="date" id="expiryDateInput" value="${formatDateForInput(selectedDate)}" onchange="updateSelectedDate()">
+            </div>
+        `;
+        
+        container.innerHTML = dateSelector;
+        
+        const now = new Date(selectedDate);
         const groups = {1:[], 2:[], 3:[], 4:[], 5:[], 6:[]};
         
         // Группируем товары по названию
@@ -566,7 +682,7 @@
         }
         
         if (!hasData) {
-            container.innerHTML = '<div class="empty-state">Нет товаров со сроком годности 1-6 месяцев</div>';
+            container.innerHTML += '<div class="empty-state">Нет товаров со сроком годности 1-6 месяцев</div>';
         }
     }
 
