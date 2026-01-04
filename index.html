@@ -540,62 +540,46 @@
         }, 150);
     }
 
-    // Группировка товаров по названию с суммированием остатков
-    function groupProductsByName() {
+    // Группировка товаров по названию И по дате срока годности (каждая партия отдельно)
+    // Используется для раздела "Сроковые"
+    function groupProductsByNameAndDate() {
         const grouped = {};
         
         rawData.forEach(item => {
-            if (!grouped[item.name]) {
-                grouped[item.name] = {
+            // Создаем уникальный ключ: название + дата срока годности (или 'no_date')
+            const expiryKey = item.expiryDate ? item.expiryDate : 'no_date';
+            const groupKey = `${item.name}|||${expiryKey}`;
+            
+            if (!grouped[groupKey]) {
+                grouped[groupKey] = {
                     name: item.name,
                     totalStock: 0,
                     warehouses: {},
-                    expiryDates: []
+                    expiryDate: item.expiryDate || null
                 };
             }
             
-            // Суммируем общий остаток
-            grouped[item.name].totalStock += (item.totalStock || 0);
-            
-            // Собираем все сроки годности
-            if (item.expiryDate) {
-                grouped[item.name].expiryDates.push(item.expiryDate);
-            }
+            // Суммируем остаток только для товаров с одинаковым названием И одинаковой датой
+            grouped[groupKey].totalStock += (item.totalStock || 0);
             
             // Объединяем склады (суммируем если склад повторяется)
             if (item.warehouses && Array.isArray(item.warehouses)) {
                 item.warehouses.forEach(wh => {
                     const loc = wh.location || wh.loc || 'Неизвестно';
-                    if (!grouped[item.name].warehouses[loc]) {
-                        grouped[item.name].warehouses[loc] = 0;
+                    if (!grouped[groupKey].warehouses[loc]) {
+                        grouped[groupKey].warehouses[loc] = 0;
                     }
-                    grouped[item.name].warehouses[loc] += (wh.count || wh.qty || 0);
+                    grouped[groupKey].warehouses[loc] += (wh.count || wh.qty || 0);
                 });
             }
         });
         
-        // Преобразуем warehouses в массив и находим ближайший срок годности
+        // Преобразуем warehouses в массив
         return Object.values(grouped).map(product => {
             product.warehouses = Object.entries(product.warehouses).map(([location, count]) => ({
                 location,
                 count
             }));
-            
-            // Находим ближайший (минимальный) срок годности
-            if (product.expiryDates.length > 0) {
-                const validDates = product.expiryDates.filter(d => {
-                    const date = new Date(d);
-                    return !isNaN(date.getTime());
-                });
-                if (validDates.length > 0) {
-                    validDates.sort((a, b) => new Date(a) - new Date(b));
-                    product.expiryDate = validDates[0]; // Самый ближайший срок
-                } else {
-                    product.expiryDate = null;
-            }
-        } else {
-                product.expiryDate = null;
-            }
             
             return product;
         });
@@ -655,8 +639,8 @@
         const now = new Date(selectedDate);
         const groups = {1:[], 2:[], 3:[], 4:[], 5:[], 6:[]};
         
-        // Группируем товары по названию
-        const groupedProducts = groupProductsByName();
+        // Группируем товары по названию и дате (каждая партия отдельно)
+        const groupedProducts = groupProductsByNameAndDate();
 
         // Распределяем по группам месяцев на основе ближайшего срока
         groupedProducts.forEach(product => {
@@ -686,11 +670,51 @@
         }
     }
 
+    // Группировка товаров только по названию (суммирование всех партий)
+    // Используется для раздела "Дефектура"
+    function groupProductsByName() {
+        const grouped = {};
+        
+        rawData.forEach(item => {
+            if (!grouped[item.name]) {
+                grouped[item.name] = {
+                    name: item.name,
+                    totalStock: 0,
+                    warehouses: {}
+                };
+            }
+            
+            // Суммируем общий остаток всех партий одного товара
+            grouped[item.name].totalStock += (item.totalStock || 0);
+            
+            // Объединяем склады (суммируем если склад повторяется)
+            if (item.warehouses && Array.isArray(item.warehouses)) {
+                item.warehouses.forEach(wh => {
+                    const loc = wh.location || wh.loc || 'Неизвестно';
+                    if (!grouped[item.name].warehouses[loc]) {
+                        grouped[item.name].warehouses[loc] = 0;
+                    }
+                    grouped[item.name].warehouses[loc] += (wh.count || wh.qty || 0);
+                });
+            }
+        });
+        
+        // Преобразуем warehouses в массив
+        return Object.values(grouped).map(product => {
+            product.warehouses = Object.entries(product.warehouses).map(([location, count]) => ({
+                location,
+                count
+            }));
+            
+            return product;
+        });
+    }
+
     function renderDefect() {
         const container = document.getElementById('container');
         container.innerHTML = '<div class="defect-title defect-line">Товары с остатком менее 500 шт.</div>';
         
-        // Группируем товары по названию и суммируем остатки
+        // Группируем товары по названию (суммируем все партии)
         const groupedProducts = groupProductsByName();
         
         // Фильтруем товары с суммарным остатком меньше 500 и сортируем от меньшего к большему
